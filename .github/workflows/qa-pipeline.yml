@@ -1,4 +1,3 @@
-@'
 name: QA Pipeline
 
 on:
@@ -24,13 +23,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run unit tests with coverage
-        run: |
-          pytest tests/unit/ \
-            --cov=app \
-            --cov-report=term-missing \
-            --cov-report=xml:reports/coverage.xml \
-            --cov-fail-under=80 \
-            -v
+        run: pytest tests/unit/ --cov=app --cov-report=term-missing --cov-fail-under=80 -v
 
   api-tests:
     name: API Integration Tests
@@ -70,10 +63,11 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
-      - name: Start Flask server in background
-        run: |
-          python run.py &
-          sleep 3
+      - name: Start Flask server
+        run: python run.py &
+
+      - name: Wait for server
+        run: sleep 3
 
       - name: Run E2E tests
         run: pytest tests/e2e/ -v --tb=short
@@ -85,12 +79,4 @@ jobs:
     if: always()
     steps:
       - name: Report status
-        run: |
-          echo "Unit Tests:  ${{ needs.unit-tests.result }}"
-          echo "API Tests:   ${{ needs.api-tests.result }}"
-          echo "E2E Tests:   ${{ needs.e2e-tests.result }}"
-'@ | Set-Content .github/workflows/qa-pipeline.yml -Encoding utf8
-
-git add .github/workflows/qa-pipeline.yml
-git commit -m "ci: fix yaml syntax error in workflow"
-git push
+        run: echo Done
