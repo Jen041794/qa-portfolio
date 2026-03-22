@@ -1,0 +1,24 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/api"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "unit: unit tests (no I/O)",
+    "api: API integration tests",
+    "e2e: end-to-end tests (requires running server)",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 80

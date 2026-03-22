@@ -1,0 +1,119 @@
+name: QA Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1：Unit Tests + Coverage
+  # ─────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/unit/ \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:reports/coverage.xml \
+            --cov-fail-under=80 \
+            -v
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: reports/coverage.xml
+
+  # ─────────────────────────────────────────────
+  # Job 2：API Integration Tests
+  # ─────────────────────────────────────────────
+  api-tests:
+    name: API Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests   # unit 通過才跑 API
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run API tests
+        run: pytest tests/api/ -v --tb=short
+
+  # ─────────────────────────────────────────────
+  # Job 3：E2E Tests（啟動真實 server）
+  # ─────────────────────────────────────────────
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: api-tests   # API 通過才跑 E2E
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Start Flask server in background
+        run: |
+          python run.py &
+          sleep 3   # 等待 server 啟動
+
+      - name: Run E2E tests
+        run: pytest tests/e2e/ -v --tb=short
+
+      - name: Upload E2E test results
+        if: always()   # 失敗時也上傳結果
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: reports/
+
+  # ─────────────────────────────────────────────
+  # Job 4：測試摘要通知（所有 job 完成後）
+  # ─────────────────────────────────────────────
+  summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, api-tests, e2e-tests]
+    if: always()
+
+    steps:
+      - name: Report status
+        run: |
+          echo "Unit Tests:  ${{ needs.unit-tests.result }}"
+          echo "API Tests:   ${{ needs.api-tests.result }}"
+          echo "E2E Tests:   ${{ needs.e2e-tests.result }}"
